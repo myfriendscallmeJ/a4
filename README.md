@@ -26,6 +26,7 @@ To start making your changes:
   *Do your awesome work!*
 
 2. Merge your changes with master
+
 This assumes you are currently on your development branch. If you are not here is how to change to it. (there is no -b needed as you are not creating a new branch). use `git branch` to list out your branches in case you've forgotten the name.
 
 ```bash
@@ -51,3 +52,8 @@ If you're using this method then make sure you have recently updated your master
 
   3. Congrats you're using git!
   Just repeat step 2, making sure you are update to date with master to avoid conflicts when merging
+
+  Conflicts may come up when running `git merge my_branch_name` so will ping me if they do and i'll walk you through it, as not sure how best to fix the notebook as yet, we may have to switch to using pull requests.
+
+
+  ### Happy hacking
