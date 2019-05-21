@@ -2,6 +2,20 @@
 
 [Project Board](https://app.asana.com/0/1123132487808262/board)
 
+## Debugging
+If you're coming across issues [Copy and paste the Project 4.ipynb here](https://jsonlint.com/) to make sure you have a valid JSON file.
+
+Make sure each of your cells have these keys: If there is more or less of these keys in each cell then this may also be causing an issue
+```json
+{
+   "cell_type": "",
+   "execution_count": 0,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+```
+
 ## Workflow:
 This workflow assumes that the master branch is always production ready, and development should be done on development branches.
 
