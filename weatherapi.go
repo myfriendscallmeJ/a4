@@ -8,6 +8,8 @@ import (
 	"time"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"math"
 	"log"
 	"os"
 	"net/http"
@@ -22,19 +24,57 @@ type worldWeather struct {
 		Error []struct{
 			Msg string `json:"msg"`
 		} `json:"error"`
-		Request []struct {
-			Type  string `json:"type"`
-			Query string `json:"query"`
-		} `json:"request"`
 		Weather []struct {
-			Date     string `json:"date"`
-			MaxtempC string `json:"maxtempC"`
-			MaxtempF string `json:"maxtempF"`
-			MintempC string `json:"mintempC"`
-			MintempF string `json:"mintempF"`
+			Date      string `json:"date"`
+			MaxtempC    string `json:"maxtempC"`
+			MintempC    string `json:"mintempC"`
+			Hourly      []struct {
+				Time           string `json:"time"`
+				TempC          string `json:"tempC"`
+				WindspeedKmph  string `json:"windspeedKmph"`
+				WinddirDegree  string `json:"winddirDegree"`
+				Winddir16Point string `json:"winddir16Point"`
+				WeatherDesc []struct {
+					Value string `json:"value"`
+				} `json:"weatherDesc"`
+				PrecipMM      string `json:"precipMM"`
+				Humidity      string `json:"humidity"`
+				Visibility    string `json:"visibility"`
+				Pressure      string `json:"pressure"`
+				Cloudcover    string `json:"cloudcover"`
+				HeatIndexC    string `json:"HeatIndexC"`
+				DewPointC     string `json:"DewPointC"`
+				WindChillC    string `json:"WindChillC"`
+				WindGustKmph  string `json:"WindGustKmph"`
+				FeelsLikeC    string `json:"FeelsLikeC"`
+				UvIndex       string `json:"uvIndex"`
+			} `json:"hourly"`
 		} `json:"weather"`
 	} `json:"data"`
 }
+ const(
+	Index = iota
+	City
+	DateTime
+	MintempC
+	MaxtempC
+	TempC
+	WindspeedKmph
+	WeatherDesc
+	WinddirDegree
+	Winddir16Point
+	PrecipMM
+	Humidity
+	Visibility
+	Pressure
+	Cloudcover
+	HeatIndexC
+	DewPointC
+	WindChillC
+	WindGustKmph
+	FeelsLikeC
+	UvIndex
+)
 
 func callAPI(key, q, date string) (*worldWeather, error) {
 	q = url.QueryEscape(q)
@@ -79,27 +119,15 @@ func GetCityTemps(ckey, cfilename *C.char) {
 		log.Fatalln("Failed reading csv file", err)
 	}
 
-	// Find first position where value is missing
-	i := 0
-	for ; i < len(data); i++ {
-		missingMinMaxTemp := len(data[i][3]) == 0 && len(data[i][4]) == 0
-		if missingMinMaxTemp {
-			break
-		}
-	}
-
-	if i == len(data) {
-		fmt.Println("All cities have temps")
-		return 
-	}
-
 	// call api
 	wg := sync.WaitGroup{}
 	maxConns := make(chan bool, 100)
 
-	for ; i < len(data); i++ {
-		if len(data[i][3]) > 0 && len(data[i][4]) > 0 {
+	for i := 0; i < len(data); i++ {
+		if len(data[i][MintempC]) > 0 && len(data[i][MaxtempC]) > 0 {
 			continue
+		} else  {
+			fmt.Println("searching:", data[i])
 		}
 
 		maxConns <- true
@@ -107,13 +135,32 @@ func GetCityTemps(ckey, cfilename *C.char) {
 		go func(i int) {
 			defer wg.Done()
 			date := convertDate(data[i][2])
-			q := data[i][1]
+			q := data[i][City]
 			res, _ := callAPI(key, q, date)
-
 			if len(res.Data.Weather) > 0 {
+				weather := res.Data.Weather[0]
+				// find nearest hourly weather
+				index := timeIndex(data[i][2])
+				hour := weather.Hourly[index]
 				// fill in missing values
-				data[i][3] = res.Data.Weather[0].MaxtempC
-				data[i][4] = res.Data.Weather[0].MaxtempC
+				data[i][MintempC] = weather.MaxtempC
+				data[i][MaxtempC] = weather.MaxtempC
+				data[i][TempC] = hour.TempC
+				data[i][WindspeedKmph] = hour.WindspeedKmph
+				data[i][WeatherDesc] = hour.WeatherDesc[0].Value
+				data[i][WinddirDegree] = hour.WinddirDegree
+				data[i][Winddir16Point] = hour.Winddir16Point
+				data[i][PrecipMM] = hour.PrecipMM
+				data[i][Humidity] = hour.Humidity
+				data[i][Visibility] = hour.Visibility
+				data[i][Pressure] = hour.Pressure
+				data[i][Cloudcover] = hour.Cloudcover
+				data[i][HeatIndexC] = hour.HeatIndexC
+				data[i][DewPointC] = hour.DewPointC
+				data[i][WindChillC] = hour.WindChillC
+				data[i][WindGustKmph] = hour.WindGustKmph
+				data[i][FeelsLikeC] = hour.FeelsLikeC
+				data[i][UvIndex] = hour.UvIndex
 			}
 
 			<-maxConns
@@ -141,6 +188,28 @@ func convertDate(date string) string {
 	d = strings.Split(d[0], "/")
 
 	return fmt.Sprintf("%s-%s-%s", d[2], d[1], d[0])
+}
+
+
+func timeIndex(time string) int {
+	times := []int{ 0, 3, 6, 9, 12, 15, 18, 21 }
+	// 13/05/2018 12:45 => 1200
+	time = strings.Split(time," ")[1]
+	hour := strings.Split(time, ":")
+	i, _ := strconv.Atoi(hour[0])
+
+	closest := 999999
+	closestIndex := 0
+
+	for index, t := range(times) {
+		test := int(math.Abs(float64(i - t)))
+		if test < closest {
+			closestIndex = index
+			closest = test
+		}
+	}
+
+	return closestIndex
 }
 
 // go build -o weatherapi.so -buildmode=c-shared weatherapi.go
